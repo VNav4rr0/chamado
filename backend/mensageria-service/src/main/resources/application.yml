@@ -1,0 +1,39 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: mensageria-service
+  datasource:
+    url: jdbc:h2:mem:mensageriadb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+services:
+  chamado:
+    url: "http://localhost:8081"
+
+# Configuração de Execução Concorrente e Gerenciamento de Fluxo (Padrão multi_request)
+concorrencia:
+  core-pool-size: 8
+  max-pool-size: 32
+  queue-capacity: 500
+  simulacao-delay-ms: 1800 # Simula latência de processamento de mensagem e alocação assíncrona
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics

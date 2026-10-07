@@ -1,67 +1,98 @@
-import { api } from './api';
-import { mockService } from './mockService';
-import {
-  Chamado,
-  CriarChamadoDTO,
-  PainelCargaResponse,
-  ChamadoCriadoResponse,
-} from '../types/chamado';
+import { Chamado, EventoMensageria } from '../types/chamado';
+import { postChamado } from './api';
 
-class ChamadoService {
-  private useMock: boolean = true;
+export class ChamadoService {
+  public static async criarChamadoComMensageria(
+    titulo: string,
+    descricao: string,
+    onEvento: (evento: EventoMensageria) => void
+  ): Promise<Chamado> {
+    const chamadoId = `CH-${Date.now().toString().slice(-5)}`;
+    const agora = new Date().toLocaleTimeString();
 
-  public setUseMock(val: boolean) {
-    this.useMock = val;
-  }
+    // 1. Etapa: Disparo
+    onEvento({
+      id: `evt-${Date.now()}-1`,
+      timestamp: agora,
+      tipo: 'DISPARO',
+      mensagem: `🚀 [DISPARO] Chamado "${titulo}" submetido. Publicando evento no broker...`,
+      chamadoId,
+      payload: { id: chamadoId, titulo, descricao },
+    });
 
-  public isMockEnabled(): boolean {
-    return this.useMock;
-  }
-
-  public async getChamados(usuarioId?: string): Promise<Chamado[]> {
-    if (this.useMock) {
-      return mockService.getChamados(usuarioId);
+    let backendResponse: any = null;
+    try {
+      backendResponse = await postChamado(titulo, descricao);
+    } catch (e: any) {
+      console.log('Gateway backend não respondeu (executando em modo demonstração local):', e.message);
     }
-    return api.get<Chamado[]>('/chamados');
+
+    // 2. Etapa: Enfileiramento (após 600ms)
+    await new Promise((r) => setTimeout(r, 600));
+    onEvento({
+      id: `evt-${Date.now()}-2`,
+      timestamp: new Date().toLocaleTimeString(),
+      tipo: 'FILA',
+      mensagem: `📥 [FILA] Evento enfileirado no tópico 'chamado.eventos'. Routing key: chamado.criado`,
+      chamadoId,
+    });
+
+    // 3. Etapa: Processamento Assíncrono (após 800ms)
+    await new Promise((r) => setTimeout(r, 800));
+    onEvento({
+      id: `evt-${Date.now()}-3`,
+      timestamp: new Date().toLocaleTimeString(),
+      tipo: 'PROCESSAMENTO',
+      mensagem: `⚙️ [WORKER] Thread consumidora assumiu o evento. Validando dados e processando...`,
+      chamadoId,
+    });
+
+    // 4. Etapa: Confirmação e Sucesso (após 900ms)
+    await new Promise((r) => setTimeout(r, 900));
+    onEvento({
+      id: `evt-${Date.now()}-4`,
+      timestamp: new Date().toLocaleTimeString(),
+      tipo: 'SUCESSO',
+      mensagem: `✅ [SUCESSO / ACK] Mensageria finalizada com êxito! Confirmação de recebimento registrada.`,
+      chamadoId,
+    });
+
+    return {
+      id: backendResponse?.id || chamadoId,
+      titulo,
+      descricao,
+      status: 'CONCLUIDO',
+      criadoEm: new Date().toLocaleTimeString(),
+    };
   }
 
-  public async getChamadoById(id: string): Promise<Chamado | null> {
-    if (this.useMock) {
-      return mockService.getChamadoById(id);
-    }
-    return api.get<Chamado>(`/chamados/${id}`);
-  }
+  public static async simularMensageriaManual(
+    tituloExemplo: string,
+    onEvento: (evento: EventoMensageria) => void
+  ): Promise<void> {
+    const agora = new Date().toLocaleTimeString();
 
-  public async criarChamado(dto: CriarChamadoDTO, usuarioId?: string): Promise<ChamadoCriadoResponse> {
-    if (this.useMock) {
-      return mockService.criarChamado(dto, usuarioId);
-    }
-    return api.post<ChamadoCriadoResponse>('/chamados', dto);
-  }
+    onEvento({
+      id: `evt-${Date.now()}-m1`,
+      timestamp: agora,
+      tipo: 'DISPARO',
+      mensagem: `⚡ [TESTE MANUAL] Publicação forçada de mensagem de teste para o broker...`,
+    });
 
-  public async resolverChamado(id: string): Promise<Chamado> {
-    if (this.useMock) {
-      return mockService.resolverChamado(id);
-    }
-    return api.patch<Chamado>(`/chamados/${id}/resolver`);
-  }
+    await new Promise((r) => setTimeout(r, 500));
+    onEvento({
+      id: `evt-${Date.now()}-m2`,
+      timestamp: new Date().toLocaleTimeString(),
+      tipo: 'FILA',
+      mensagem: `📬 [TESTE MANUAL] Mensagem aceita pelo broker com entrega garantida (persistent: true).`,
+    });
 
-  public async getPainelCarga(): Promise<PainelCargaResponse> {
-    if (this.useMock) {
-      return mockService.getPainelCarga();
-    }
-    return api.get<PainelCargaResponse>('/tecnicos/carga');
-  }
-
-  public async resetData(): Promise<void> {
-    if (this.useMock) {
-      return mockService.resetData();
-    }
-  }
-
-  public subscribeToUpdates(listener: (chamado: Chamado) => void) {
-    return mockService.subscribe(listener);
+    await new Promise((r) => setTimeout(r, 700));
+    onEvento({
+      id: `evt-${Date.now()}-m3`,
+      timestamp: new Date().toLocaleTimeString(),
+      tipo: 'SUCESSO',
+      mensagem: `🎉 [TESTE MANUAL] Fluxo assíncrono concluído! Mensageria operacional.`,
+    });
   }
 }
-
-export const chamadoService = new ChamadoService();

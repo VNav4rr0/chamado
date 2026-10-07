@@ -1,82 +1,59 @@
-# Central de Chamados - Portal Web Corporativo (React Native Web + TypeScript)
+# Central de Chamados - Portal Front-end Simplificado
 
-Portal Web Corporativo para gerenciamento de suporte técnico desenvolvido com **React Native for Web**, **TypeScript**, **Expo** e **Material Design 3 (React Native Paper)**.
-
-O sistema foi arquitetado para visualização em **navegadores desktop**, contando com top navbar fixa, layout em duas colunas, grids responsivos de cards, dashboard com KPIs, monitoramento em tempo real de SLA e simulação completa de mensageria assíncrona orientada a eventos (**RabbitMQ & Transactional Outbox**).
+Portal web simplificado e objetivo para abertura de chamados técnicos e demonstração visual de **mensageria assíncrona orientada a eventos**, desenvolvido em **React Native for Web**, **TypeScript** e **Material Design 3 (React Native Paper)**.
 
 ---
 
-## 💻 Características do Portal Web
+## 🎯 Características do Front-end Simplificado
 
-### 1. 🌐 Top Navbar Corporativa Fixa (`WebNavbar.tsx`)
-- Identidade visual com logo estilizado e indicação de status do sistema (*Portal Web Enterprise*).
-- Navegação desktop por abas no topo:
-  - 📋 **Meus Chamados**
-  - ➕ **Abrir Chamado**
-  - 👥 **Equipe Técnica**
-  - ⚙️ **Configurações**
-- Indicador em tempo real de infraestrutura: *RabbitMQ Ativo* ou *Gateway Conectado*.
-- Alternador de tema claro/escuro e perfil do usuário logado.
+1. **Formulário Único & Direto**:
+   - Campos essenciais de **Título** e **Descrição**.
+   - Validação imediata e criação com disparo de mensagem em tempo real.
+   - Card com resumo visual do último chamado registrado e confirmado.
 
-### 2. 📊 Dashboard de Chamados (`ChamadosListScreen.tsx`)
-- **4 Cards Horizontais de KPI**: Total Geral, Em Andamento, Fila de Espera e Resolvidos com micro-ícones e tipografia display de alta fidelidade.
-- **Barra de Controle & Filtros**:
-  - Busca em tempo real por protocolo (ex: `CH-2026-000101`), título ou técnico.
-  - Abas de status com badges contadores numéricos.
-  - Seletor de departamentos (*Rede*, *Hardware*, *Software*, *Acesso*).
-- **Grid de Cards Responsivo**: Exibição em duas colunas no desktop com barra lateral de acento colorido, SLA dinâmico e cursor pointer.
+2. **Seção Visual de Mensageria & Logs em Tempo Real**:
+   - **Pipeline Visual em 4 Etapas**:
+     1. 🚀 **Disparo**: Chamado enviado ao broker/fila.
+     2. 📥 **Na Fila**: Evento enfileirado (`chamado.criado`).
+     3. ⚙️ **Worker**: Consumo assíncrono pelo processador concorrente.
+     4. ✅ **Sucesso (ACK)**: Confirmação de recebimento e persistência.
+   - **Disparo Manual de Teste**: Botão para simular o tráfego de mensageria avulso a qualquer momento.
+   - **Terminal de Eventos**: Log cronológico com badges coloridos, timestamp e descrição detalhada.
 
-### 3. ➕ Abertura de Chamado em Duas Colunas (`NovoChamadoScreen.tsx`)
-- **Coluna Principal (60%)**:
-  - Seleção de categoria em grid 2x2 com cards ilustrados e checkmark ativo.
-  - Seleção de prioridade com cálculo automático de SLA (4h, 8h, 24h e 72h).
-  - Campos de entrada de título e descrição multilinha com validação em tempo real.
-- **Coluna Lateral (40%)**:
-  - Explicação do ciclo de vida assíncrono (Transactional Outbox e HTTP 202 Accepted).
-  - Card de previsão de atendimento mostrando os técnicos ativos da especialidade e suas cargas atuais.
-  - Botão de confirmação em gradiente com feedback visual imediato.
-
-### 4. 🔍 Detalhes do Chamado em Layout Master-Detail (`ChamadoDetailScreen.tsx`)
-- Breadcrumbs no topo para navegação fluida.
-- **Coluna Principal (65%)**:
-  - Protocolo em fonte destacada e pill de status.
-  - Descrição detalhada do problema.
-  - Linha do tempo visual cronológica (`TimelineView.tsx`) mostrando todas as transições de status e eventos RabbitMQ.
-- **Coluna Lateral (35%)**:
-  - Acordo de Nível de Serviço (SLA) com barra regressiva dinâmica.
-  - Card completo do técnico alocado com avatar em gradiente e status.
-  - Botão de ação para resolução (`PATCH /api/chamados/{id}/resolver`) com liberação de carga e desrepresamento.
-
-### 5. 👥 Painel da Equipe Técnica (`PainelTecnicosScreen.tsx`)
-- Medidor amplo de ocupação geral da equipe técnica com percentual e alertas por cor.
-- Grid dos 8 técnicos oficiais pré-cadastrados (*Roberto Redes*, *Renata Roteadores*, *Hugo Hardware*, *Helena Hard*, *Sofia Software*, *Samuel Sistemas*, *Alice Acessos*, *Arthur Autenticação*).
-- Barras de capacidade individual (*Carga Atual / Capacidade Máxima*).
-
-### 6. ⚙️ Configurações & Topologia (`SettingsScreen.tsx`)
-- Alternador de Modo Simulado (Mock RabbitMQ) vs Conexão com o Spring Cloud Gateway na porta `8080`.
-- Campo para configuração da URL da API e identificador do usuário (`X-Usuario-Id`).
-- Visão da topologia de microsserviços do backend (Gateway, chamado-service, atendimento-service e RabbitMQ).
-- Botão para restauração de dados originais de fábrica.
+3. **Arquitetura Limpa**:
+   - Todos os ecrãs secundários, abas complexas, rotas legadas e regras redundantes foram removidos.
+   - Código enxuto e de inicialização instantânea.
 
 ---
 
-## 🚀 Como Executar no Navegador Web
+## 🚀 Como Executar o Front-end
 
-No terminal, dentro da pasta do projeto:
+Dentro da pasta do projeto:
 
 ```bash
-cd c:\Users\vn120\Downloads\chamado
+cmd /c "npm start"
 ```
 
-### 1. Iniciar a aplicação web
+Ou diretamente com o Expo Web:
+
 ```bash
-npm start
-```
-*(O comando `npm start` já está configurado para abrir diretamente a versão Web!)*
-
-Ou execute explicitamente:
-```bash
-npx expo start --web
+cmd /c "npx expo start --web"
 ```
 
-A aplicação abrirá no seu navegador padrão (geralmente em `http://localhost:8081`).
+A aplicação abrirá no seu navegador padrão em `http://localhost:8081`.
+
+---
+
+## 🏛️ Microsserviços Backend (Pasta `backend/`)
+
+Na pasta [`backend/`](file:///c:/Users/Estágio/chamado/backend), você encontra a arquitetura completa de microsserviços Spring Boot com banco H2:
+- **`GATEWAY`** (Porta 8080)
+- **`LOGIN`** (Porta 8083)
+- **`chamado-service`** (Porta 8081)
+- **`mensageria-service`** (Porta 8082)
+
+Para iniciar os 4 microsserviços em paralelo:
+```powershell
+cd backend
+.\run-all.ps1
+```
