@@ -1,11 +1,33 @@
+import { setCookie, getCookie, deleteCookie } from '../utils/cookies';
+
 const API_BASE_URL = 'http://localhost:8080';
 
-let authToken: string | null = null;
-let currentUsername: string = 'admin';
+// Initialize from cookies on startup
+let authToken: string | null = getCookie('auth_token');
+let currentUsername: string = getCookie('auth_username') || 'admin';
+let currentUserRole: string = getCookie('auth_role') || 'ROLE_USER';
 
-export function setAuthToken(token: string | null, username?: string) {
+export function setAuthToken(token: string | null, username?: string, role?: string) {
   authToken = token;
-  if (username) currentUsername = username;
+  if (token) {
+    setCookie('auth_token', token);
+  } else {
+    deleteCookie('auth_token');
+  }
+
+  if (username) {
+    currentUsername = username;
+    setCookie('auth_username', username);
+  } else {
+    deleteCookie('auth_username');
+  }
+
+  if (role) {
+    currentUserRole = role;
+    setCookie('auth_role', role);
+  } else {
+    deleteCookie('auth_role');
+  }
 }
 
 export function getAuthToken(): string | null {
@@ -17,6 +39,7 @@ export async function requestApi<T>(endpoint: string, options: RequestInit = {})
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Usuario-Id': currentUsername,
+    'X-Usuario-Role': currentUserRole,
     ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
     ...(options.headers as Record<string, string>),
   };

@@ -13,12 +13,15 @@ public class RegisterRequest {
     @NotBlank(message = "Nome é obrigatório")
     private String nome;
 
+    private boolean admin;
+
     public RegisterRequest() {}
 
-    public RegisterRequest(String username, String password, String nome) {
+    public RegisterRequest(String username, String password, String nome, boolean admin) {
         this.username = username;
         this.password = password;
         this.nome = nome;
+        this.admin = admin;
     }
 
     public String getUsername() {
@@ -43,5 +46,13 @@ public class RegisterRequest {
 
     public void setNome(String nome) {
         this.nome = nome;
+    }
+
+    public boolean isAdmin() {
+        return admin;
+    }
+
+    public void setAdmin(boolean admin) {
+        this.admin = admin;
     }
 }

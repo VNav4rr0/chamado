@@ -1,23 +1,38 @@
 import { Usuario, LoginResponse } from '../types/auth';
 import { requestApi, setAuthToken } from './api';
+import { getCookie, setCookie, deleteCookie } from '../utils/cookies';
+
+// Tenta recuperar a sessão salva nos cookies
+const savedToken = getCookie('auth_token');
+const savedUsername = getCookie('auth_username');
+const savedRole = getCookie('auth_role');
 
 let usuarioArmazenado: Usuario | null = null;
-const contasLocais: Record<string, { password: string; nome: string }> = {};
+if (savedToken && savedUsername) {
+  usuarioArmazenado = {
+    username: savedUsername,
+    nome: getCookie('auth_nome') || savedUsername, // Adicionaremos a gravação de auth_nome depois
+    role: savedRole || 'ROLE_USER',
+  };
+}
+
+const contasLocais: Record<string, { password: string; nome: string; role: string }> = {};
 
 export class AuthService {
-  public static async register(username: string, password: string, nome: string): Promise<void> {
+  public static async register(username: string, password: string, nome: string, isAdmin: boolean = false): Promise<void> {
     const userTrim = username.trim();
     const passTrim = password.trim();
     const nomeTrim = nome.trim() || userTrim;
+    const role = isAdmin ? 'ROLE_ADMIN' : 'ROLE_USER';
 
     try {
       await requestApi('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ username: userTrim, password: passTrim, nome: nomeTrim }),
+        body: JSON.stringify({ username: userTrim, password: passTrim, nome: nomeTrim, admin: isAdmin }),
       });
     } catch (e: any) {
       console.warn('Backend indisponível no momento, registrando conta localmente:', e.message);
-      contasLocais[userTrim] = { password: passTrim, nome: nomeTrim };
+      contasLocais[userTrim] = { password: passTrim, nome: nomeTrim, role };
     }
   }
 
@@ -32,7 +47,9 @@ export class AuthService {
         body: JSON.stringify({ username: userTrim, password: passTrim }),
       });
 
-      setAuthToken(data.token, data.username);
+      setAuthToken(data.token, data.username, data.role);
+      setCookie('auth_nome', data.nome);
+
       const user: Usuario = {
         username: data.username,
         nome: data.nome,
@@ -43,15 +60,16 @@ export class AuthService {
     } catch (apiError: any) {
       console.warn('Falha na chamada do backend. Verificando contas cadastradas:', apiError.message);
 
-      // 2. Verifica se é uma conta cadastrada pelo usuário na sessão local
       if (contasLocais[userTrim] && contasLocais[userTrim].password === passTrim) {
         const conta = contasLocais[userTrim];
         const user: Usuario = {
           username: userTrim,
           nome: conta.nome,
-          role: 'ROLE_USER',
+          role: conta.role,
         };
-        setAuthToken('token-' + Date.now(), userTrim);
+        setAuthToken('token-' + Date.now(), userTrim, conta.role);
+        setCookie('auth_nome', conta.nome);
+
         usuarioArmazenado = user;
         return user;
       }
@@ -61,7 +79,8 @@ export class AuthService {
   }
 
   public static logout(): void {
-    setAuthToken(null);
+    setAuthToken(null, 'admin', 'ROLE_USER');
+    deleteCookie('auth_nome');
     usuarioArmazenado = null;
   }
 

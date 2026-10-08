@@ -12,7 +12,7 @@ import { Usuario } from './src/types/auth';
 import { AuthService } from './src/services/authService';
 
 export default function App() {
-  const [usuarioAutenticado, setUsuarioAutenticado] = useState<Usuario | null>(null);
+  const [usuarioAutenticado, setUsuarioAutenticado] = useState<Usuario | null>(AuthService.getUsuarioLogado());
 
   const handleLoginSuccess = (usuario: Usuario) => {
     setUsuarioAutenticado(usuario);

@@ -47,4 +47,24 @@ public class ChamadoService {
     public Chamado buscarPorId(String id) {
         return chamadoRepository.findById(id).orElse(null);
     }
+
+    public Chamado atualizarStatus(String id, String novoStatus) {
+        Chamado chamado = chamadoRepository.findById(id).orElse(null);
+        if (chamado != null) {
+            chamado.setStatus(novoStatus);
+            Chamado atualizado = chamadoRepository.save(chamado);
+            mensageriaService.dispararMensagemManual("Chamado " + id + " atualizado para '" + novoStatus + "' pelo Administrador.");
+            return atualizado;
+        }
+        return null;
+    }
+
+    public boolean deletarChamado(String id) {
+        if (chamadoRepository.existsById(id)) {
+            chamadoRepository.deleteById(id);
+            mensageriaService.dispararMensagemManual("Chamado " + id + " excluído do sistema pelo Administrador.");
+            return true;
+        }
+        return false;
+    }
 }

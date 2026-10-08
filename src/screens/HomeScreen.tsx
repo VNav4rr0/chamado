@@ -27,6 +27,7 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => {
   const { width } = useWindowDimensions();
   const isDesktop = width >= 900;
+  const isAdmin = usuario.role === 'ROLE_ADMIN' || usuario.username.toLowerCase() === 'admin';
 
   // Estados do formulário
   const [titulo, setTitulo] = useState('');
@@ -38,6 +39,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
   const [chamados, setChamados] = useState<Chamado[]>([]);
   const [logs, setLogs] = useState<MensagemLog[]>([]);
   const [etapaAtiva, setEtapaAtiva] = useState<string | null>(null);
+
+  // Estados de controle ADM
+  const [filtroAba, setFiltroAba] = useState<'TODOS' | 'MEUS'>(isAdmin ? 'TODOS' : 'MEUS');
+  const [filtroStatus, setFiltroStatus] = useState<'TODOS' | 'ABERTO' | 'EM_PROCESSAMENTO' | 'CONCLUIDO'>('TODOS');
+  const [acaoLoadingId, setAcaoLoadingId] = useState<string | null>(null);
 
   // Carrega dados iniciais
   const carregarDados = async () => {
@@ -78,7 +84,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
       setEtapaAtiva('DISPARO');
       const logDisparo = await ChamadoService.registrarLogSimulado(
         'DISPARO',
-        `🚀 [DISPARO] Chamado "${tit}" enviado ao broker de mensageria.`
+        `🚀 [DISPARO] Chamado "${tit}" criado por ${usuario.username} e enviado ao broker.`
       );
       setLogs((prev) => [logDisparo, ...prev]);
 
@@ -117,11 +123,59 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
     }
   };
 
+  const handleAtualizarStatus = async (id: string, novoStatus: string) => {
+    setAcaoLoadingId(id);
+    try {
+      const atualizado = await ChamadoService.atualizarStatus(id, novoStatus);
+      if (atualizado) {
+        setChamados((prev) => prev.map((c) => (c.id === id ? { ...c, status: novoStatus } : c)));
+      } else {
+        setChamados((prev) => prev.map((c) => (c.id === id ? { ...c, status: novoStatus } : c)));
+      }
+
+      const log = await ChamadoService.registrarLogSimulado(
+        'WORKER',
+        `⚙️ [ADM-STATUS] Chamado ${id} alterado para "${novoStatus}" pelo Administrador ${usuario.username}.`,
+        id
+      );
+      setLogs((prev) => [log, ...prev]);
+    } catch (err: any) {
+      alert('Erro ao atualizar status: ' + err.message);
+    } finally {
+      setAcaoLoadingId(null);
+    }
+  };
+
+  const handleExcluirChamado = async (id: string) => {
+    const confirmado = typeof window !== 'undefined' && window.confirm
+      ? window.confirm(`Deseja realmente excluir o chamado ${id}?`)
+      : true;
+
+    if (!confirmado) return;
+
+    setAcaoLoadingId(id);
+    try {
+      await ChamadoService.deletarChamado(id);
+      setChamados((prev) => prev.filter((c) => c.id !== id));
+
+      const log = await ChamadoService.registrarLogSimulado(
+        'DISPARO',
+        `🗑️ [ADM-DELETE] Chamado ${id} removido do sistema pelo Administrador ${usuario.username}.`,
+        id
+      );
+      setLogs((prev) => [log, ...prev]);
+    } catch (err: any) {
+      alert('Erro ao excluir chamado: ' + err.message);
+    } finally {
+      setAcaoLoadingId(null);
+    }
+  };
+
   const handleTesteManualMensageria = async () => {
     setEtapaAtiva('DISPARO');
     const log1 = await ChamadoService.registrarLogSimulado(
       'DISPARO',
-      '⚡ [MANUAL] Disparo de evento avulso enviado pelo usuário ' + usuario.username
+      `⚡ [MANUAL] Disparo de evento avulso pelo ${isAdmin ? 'Administrador' : 'Usuário'} ${usuario.username}`
     );
     setLogs((prev) => [log1, ...prev]);
 
@@ -138,11 +192,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
   const getCorBadgeStatus = (status: string) => {
     switch (status) {
       case 'CONCLUIDO':
-        return { bg: '#d1fae5', text: '#065f46' };
+        return { bg: '#d1fae5', text: '#065f46', border: '#a7f3d0' };
       case 'EM_PROCESSAMENTO':
-        return { bg: '#e0e7ff', text: '#3730a3' };
+        return { bg: '#e0e7ff', text: '#3730a3', border: '#c7d2fe' };
       default:
-        return { bg: '#fef3c7', text: '#92400e' };
+        return { bg: '#fef3c7', text: '#92400e', border: '#fde68a' };
     }
   };
 
@@ -161,6 +215,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
     }
   };
 
+  // Métricas para exibição administrativa
+  const totalChamados = chamados.length;
+  const totalAbertos = chamados.filter((c) => c.status === 'ABERTO').length;
+  const totalEmProcesso = chamados.filter((c) => c.status === 'EM_PROCESSAMENTO').length;
+  const totalConcluidos = chamados.filter((c) => c.status === 'CONCLUIDO').length;
+
+  // Filtragem dos chamados
+  const chamadosFiltrados = chamados.filter((c) => {
+    if (isAdmin && filtroAba === 'MEUS') {
+      if (c.usuarioId && c.usuarioId !== usuario.username) return false;
+    } else if (!isAdmin) {
+      if (c.usuarioId && c.usuarioId !== usuario.username) return false;
+    }
+
+    if (filtroStatus !== 'TODOS' && c.status !== filtroStatus) {
+      return false;
+    }
+
+    return true;
+  });
+
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -169,17 +244,30 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
     >
       <View style={styles.contentWrapper}>
         {/* Topbar do Usuário Autenticado */}
-        <View style={styles.userBar}>
+        <View style={[styles.userBar, isAdmin && styles.userBarAdmin]}>
           <View style={styles.userInfo}>
-            <View style={styles.avatarWrap}>
-              <MaterialCommunityIcons name="account-circle" size={32} color="#4f46e5" />
+            <View style={[styles.avatarWrap, isAdmin && styles.avatarWrapAdmin]}>
+              <MaterialCommunityIcons
+                name={isAdmin ? 'crown' : 'account-circle'}
+                size={26}
+                color={isAdmin ? '#b45309' : '#4f46e5'}
+              />
             </View>
             <View>
-              <Text variant="titleMedium" style={styles.userNome}>
-                {usuario.nome}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text variant="titleMedium" style={styles.userNome}>
+                  {usuario.nome}
+                </Text>
+                {isAdmin && (
+                  <View style={styles.crownBadge}>
+                    <Text style={styles.crownBadgeText}>👑 ADM</Text>
+                  </View>
+                )}
+              </View>
               <Text variant="bodySmall" style={styles.userRole}>
-                Logado como: <Text style={{ fontWeight: '700' }}>{usuario.username}</Text> ({usuario.role})
+                {isAdmin
+                  ? `Perfil Administrador • ${usuario.username}`
+                  : `Usuário Solicitante • ${usuario.username}`}
               </Text>
             </View>
           </View>
@@ -195,10 +283,32 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
           </Button>
         </View>
 
+        {/* Dashboard de Métricas Administrativas */}
+        {isAdmin && (
+          <View style={styles.statsRow}>
+            <View style={[styles.statBox, { borderColor: '#e2e8f0' }]}>
+              <Text style={styles.statNumber}>{totalChamados}</Text>
+              <Text style={styles.statLabel}>Total Geral</Text>
+            </View>
+            <View style={[styles.statBox, { borderColor: '#fde68a', backgroundColor: '#fffbeb' }]}>
+              <Text style={[styles.statNumber, { color: '#b45309' }]}>{totalAbertos}</Text>
+              <Text style={[styles.statLabel, { color: '#92400e' }]}>Abertos</Text>
+            </View>
+            <View style={[styles.statBox, { borderColor: '#c7d2fe', backgroundColor: '#eef2ff' }]}>
+              <Text style={[styles.statNumber, { color: '#4338ca' }]}>{totalEmProcesso}</Text>
+              <Text style={[styles.statLabel, { color: '#3730a3' }]}>Em Andamento</Text>
+            </View>
+            <View style={[styles.statBox, { borderColor: '#a7f3d0', backgroundColor: '#ecfdf5' }]}>
+              <Text style={[styles.statNumber, { color: '#047857' }]}>{totalConcluidos}</Text>
+              <Text style={[styles.statLabel, { color: '#065f46' }]}>Concluídos</Text>
+            </View>
+          </View>
+        )}
+
         {/* Layout Principal em Colunas */}
         <View style={[styles.mainGrid, { flexDirection: isDesktop ? 'row' : 'column' }]}>
           {/* COLUNA 1: Formulário + Lista de Chamados */}
-          <View style={[styles.column, isDesktop && { flex: 1.1 }]}>
+          <View style={[styles.column, isDesktop && { flex: 1.15 }]}>
             {/* Card de Formulário */}
             <Card style={styles.card}>
               <Card.Content style={styles.cardContent}>
@@ -254,9 +364,13 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
               <Card.Content style={styles.cardContent}>
                 <View style={styles.cardHeaderBetween}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <MaterialCommunityIcons name="format-list-bulleted" size={22} color="#0f172a" />
+                    <MaterialCommunityIcons
+                      name={isAdmin ? 'shield-crown-outline' : 'format-list-bulleted'}
+                      size={22}
+                      color={isAdmin ? '#b45309' : '#0f172a'}
+                    />
                     <Text variant="titleMedium" style={[styles.cardTitle, { marginLeft: 8 }]}>
-                      Chamados Registrados ({chamados.length})
+                      {isAdmin ? 'Gerenciador de Chamados (ADM)' : 'Meus Chamados'} ({chamadosFiltrados.length})
                     </Text>
                   </View>
                   <Button compact mode="text" onPress={onRefresh} icon="refresh">
@@ -264,17 +378,92 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
                   </Button>
                 </View>
 
-                {chamados.length === 0 ? (
-                  <Text style={styles.emptyText}>Nenhum chamado aberto ainda.</Text>
+                {/* Filtros para Administrador */}
+                {isAdmin && (
+                  <View style={styles.adminFilterBar}>
+                    {/* Alternância de Escopo */}
+                    <View style={styles.scopeButtons}>
+                      <TouchableOpacity
+                        style={[styles.scopeBtn, filtroAba === 'TODOS' && styles.scopeBtnActive]}
+                        onPress={() => setFiltroAba('TODOS')}
+                      >
+                        <Text style={[styles.scopeBtnText, filtroAba === 'TODOS' && styles.scopeBtnTextActive]}>
+                          Todos ({totalChamados})
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.scopeBtn, filtroAba === 'MEUS' && styles.scopeBtnActive]}
+                        onPress={() => setFiltroAba('MEUS')}
+                      >
+                        <Text style={[styles.scopeBtnText, filtroAba === 'MEUS' && styles.scopeBtnTextActive]}>
+                          Abertos por Mim
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Chips de Status */}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
+                      <Chip
+                        selected={filtroStatus === 'TODOS'}
+                        onPress={() => setFiltroStatus('TODOS')}
+                        style={styles.statusChip}
+                        textStyle={{ fontSize: 11 }}
+                      >
+                        Todos Status
+                      </Chip>
+                      <Chip
+                        selected={filtroStatus === 'ABERTO'}
+                        onPress={() => setFiltroStatus('ABERTO')}
+                        style={styles.statusChip}
+                        textStyle={{ fontSize: 11 }}
+                      >
+                        Abertos ({totalAbertos})
+                      </Chip>
+                      <Chip
+                        selected={filtroStatus === 'EM_PROCESSAMENTO'}
+                        onPress={() => setFiltroStatus('EM_PROCESSAMENTO')}
+                        style={styles.statusChip}
+                        textStyle={{ fontSize: 11 }}
+                      >
+                        Em Andamento ({totalEmProcesso})
+                      </Chip>
+                      <Chip
+                        selected={filtroStatus === 'CONCLUIDO'}
+                        onPress={() => setFiltroStatus('CONCLUIDO')}
+                        style={styles.statusChip}
+                        textStyle={{ fontSize: 11 }}
+                      >
+                        Concluídos ({totalConcluidos})
+                      </Chip>
+                    </ScrollView>
+                  </View>
+                )}
+
+                {chamadosFiltrados.length === 0 ? (
+                  <Text style={styles.emptyText}>
+                    {isAdmin
+                      ? 'Nenhum chamado encontrado para o filtro selecionado.'
+                      : 'Você ainda não possui chamados abertos.'}
+                  </Text>
                 ) : (
                   <View style={styles.chamadosList}>
-                    {chamados.map((item) => {
+                    {chamadosFiltrados.map((item) => {
                       const badge = getCorBadgeStatus(item.status);
+                      const isItemLoading = acaoLoadingId === item.id;
+
                       return (
                         <View key={item.id} style={styles.chamadoItem}>
                           <View style={styles.itemHeader}>
-                            <Text style={styles.itemId}>{item.id}</Text>
-                            <View style={[styles.statusBadge, { backgroundColor: badge.bg }]}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.itemId}>{item.id}</Text>
+                              {item.usuarioId && (
+                                <View style={styles.authorBadge}>
+                                  <Text style={styles.authorBadgeText}>👤 {item.usuarioId}</Text>
+                                </View>
+                              )}
+                            </View>
+
+                            <View style={[styles.statusBadge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
                               <Text style={[styles.statusBadgeText, { color: badge.text }]}>
                                 {item.status}
                               </Text>
@@ -286,10 +475,81 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
 
                           <View style={styles.itemFooter}>
                             <Text style={styles.itemData}>🕒 {item.criadoEm}</Text>
-                            {item.usuarioId && (
-                              <Text style={styles.itemUser}>👤 {item.usuarioId}</Text>
-                            )}
                           </View>
+
+                          {/* PAINEL DE CONTROLE EXCLUSIVO DO ADMINISTRADOR */}
+                          {isAdmin && (
+                            <View style={styles.adminActionRow}>
+                              <View style={styles.adminActionLabelWrap}>
+                                <MaterialCommunityIcons name="shield-star" size={14} color="#b45309" />
+                                <Text style={styles.adminActionTitle}>Ações ADM:</Text>
+                              </View>
+
+                              <View style={styles.adminBtnGroup}>
+                                {item.status !== 'EM_PROCESSAMENTO' && (
+                                  <Button
+                                    compact
+                                    mode="contained-tonal"
+                                    onPress={() => handleAtualizarStatus(item.id, 'EM_PROCESSAMENTO')}
+                                    loading={isItemLoading}
+                                    disabled={isItemLoading}
+                                    style={styles.adminBtn}
+                                    labelStyle={{ fontSize: 11 }}
+                                    buttonColor="#e0e7ff"
+                                    textColor="#3730a3"
+                                  >
+                                    Atender
+                                  </Button>
+                                )}
+
+                                {item.status !== 'CONCLUIDO' && (
+                                  <Button
+                                    compact
+                                    mode="contained-tonal"
+                                    onPress={() => handleAtualizarStatus(item.id, 'CONCLUIDO')}
+                                    loading={isItemLoading}
+                                    disabled={isItemLoading}
+                                    style={styles.adminBtn}
+                                    labelStyle={{ fontSize: 11 }}
+                                    buttonColor="#d1fae5"
+                                    textColor="#065f46"
+                                  >
+                                    Concluir
+                                  </Button>
+                                )}
+
+                                {item.status === 'CONCLUIDO' && (
+                                  <Button
+                                    compact
+                                    mode="contained-tonal"
+                                    onPress={() => handleAtualizarStatus(item.id, 'ABERTO')}
+                                    loading={isItemLoading}
+                                    disabled={isItemLoading}
+                                    style={styles.adminBtn}
+                                    labelStyle={{ fontSize: 11 }}
+                                    buttonColor="#fef3c7"
+                                    textColor="#92400e"
+                                  >
+                                    Reabrir
+                                  </Button>
+                                )}
+
+                                <Button
+                                  compact
+                                  mode="outlined"
+                                  onPress={() => handleExcluirChamado(item.id)}
+                                  loading={isItemLoading}
+                                  disabled={isItemLoading}
+                                  style={[styles.adminBtn, { borderColor: '#fca5a5' }]}
+                                  labelStyle={{ fontSize: 11 }}
+                                  textColor="#ef4444"
+                                  icon="delete-outline"
+                                >
+                                  Excluir
+                                </Button>
+                              </View>
+                            </View>
+                          )}
                         </View>
                       );
                     })}
@@ -300,7 +560,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
           </View>
 
           {/* COLUNA 2: Simulação de Mensageria e Logs */}
-          <View style={[styles.column, isDesktop && { flex: 0.9, marginLeft: 18 }]}>
+          <View style={[styles.column, isDesktop && { flex: 0.85, marginLeft: 18 }]}>
             <Card style={styles.card}>
               <Card.Content style={styles.cardContent}>
                 <View style={styles.cardHeaderBetween}>
@@ -324,7 +584,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({ usuario, onLogout }) => 
                 </View>
 
                 <Text variant="bodySmall" style={styles.mensageriaDesc}>
-                  Simula o disparo assíncrono e a entrega de mensagens no broker a cada novo chamado.
+                  Simula o disparo assíncrono e a entrega de mensagens no broker a cada novo chamado ou alteração de status.
                 </Text>
 
                 {/* Pipeline Visual das Etapas */}
@@ -393,7 +653,7 @@ const styles = StyleSheet.create({
   },
   contentWrapper: {
     width: '100%',
-    maxWidth: 1120,
+    maxWidth: 1160,
   },
   userBar: {
     flexDirection: 'row',
@@ -402,22 +662,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 14,
-    marginBottom: 18,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: '#e2e8f0',
+  },
+  userBarAdmin: {
+    borderColor: '#fde68a',
+    backgroundColor: '#fffdfa',
   },
   userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
   avatarWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#eef2ff',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarWrapAdmin: {
+    backgroundColor: '#fef3c7',
+  },
+  crownBadge: {
+    backgroundColor: '#fef3c7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  crownBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#b45309',
   },
   userNome: {
     fontWeight: '800',
@@ -425,10 +705,38 @@ const styles = StyleSheet.create({
   },
   userRole: {
     color: '#64748b',
+    marginTop: 2,
   },
   logoutButton: {
     borderColor: '#fca5a5',
     borderRadius: 10,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  statBox: {
+    flex: 1,
+    minWidth: 110,
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#0f172a',
+  },
+  statLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    marginTop: 2,
   },
   mainGrid: {
     gap: 16,
@@ -455,11 +763,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 14,
+    marginBottom: 12,
   },
   cardTitle: {
     fontWeight: '800',
     color: '#0f172a',
+  },
+  adminFilterBar: {
+    marginBottom: 14,
+    gap: 8,
+  },
+  scopeButtons: {
+    flexDirection: 'row',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 3,
+  },
+  scopeBtn: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  scopeBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+  },
+  scopeBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  scopeBtnTextActive: {
+    color: '#b45309',
+  },
+  chipsScroll: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  statusChip: {
+    marginRight: 6,
+    height: 30,
   },
   input: {
     backgroundColor: '#ffffff',
@@ -496,10 +843,22 @@ const styles = StyleSheet.create({
     color: '#4f46e5',
     fontSize: 13,
   },
+  authorBadge: {
+    backgroundColor: '#e2e8f0',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  authorBadgeText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#475569',
+  },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
+    borderWidth: 1,
   },
   statusBadgeText: {
     fontSize: 10,
@@ -528,9 +887,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94a3b8',
   },
-  itemUser: {
+  adminActionRow: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  adminActionLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  adminActionTitle: {
     fontSize: 11,
-    color: '#94a3b8',
+    fontWeight: '800',
+    color: '#b45309',
+  },
+  adminBtnGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  adminBtn: {
+    borderRadius: 6,
   },
   mensageriaDesc: {
     color: '#64748b',

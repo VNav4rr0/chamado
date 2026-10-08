@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, TextInput, Button, Card } from 'react-native-paper';
+import { Text, TextInput, Button, Card, Switch } from 'react-native-paper';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { AuthService } from '../services/authService';
 import { Usuario } from '../types/auth';
@@ -12,11 +12,12 @@ interface LoginScreenProps {
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [modo, setModo] = useState<'LOGIN' | 'CADASTRO'>('LOGIN');
 
-  // Campos do formulário inseridos pelo próprio usuário
+  // Campos do formulário
   const [nome, setNome] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -43,11 +44,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     try {
       if (modo === 'CADASTRO') {
-        // Registra a conta com os dados fornecidos pelo usuário
-        await AuthService.register(userTrim, passTrim, nome.trim());
-        setSuccessMessage('Conta criada com sucesso! Realizando login...');
-        
-        // Faz o login automático com as credenciais recém-criadas
+        // Registra a conta com os dados e perfil escolhido (Comum ou ADM)
+        await AuthService.register(userTrim, passTrim, nome.trim(), isAdmin);
+        setSuccessMessage(
+          isAdmin
+            ? 'Conta de Administrador (ADM) criada com sucesso! Acessando...'
+            : 'Conta criada com sucesso! Acessando...'
+        );
+
+        // Login automático com os dados inseridos
         const usuarioLogado = await AuthService.login(userTrim, passTrim);
         onLoginSuccess(usuarioLogado);
       } else {
@@ -183,18 +188,38 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
               disabled={loading}
             />
 
+            {/* Opção de Criar Conta como Administrador (ADM) */}
+            {modo === 'CADASTRO' && (
+              <View style={styles.admSwitchRow}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <MaterialCommunityIcons name="crown" size={18} color="#f59e0b" />
+                    <Text style={styles.admSwitchLabel}>Acesso de Administrador (ADM)</Text>
+                  </View>
+                  <Text style={styles.admSwitchDesc}>
+                    Concede permissões completas de gerência e resolução de tickets.
+                  </Text>
+                </View>
+                <Switch value={isAdmin} onValueChange={setIsAdmin} color="#f59e0b" />
+              </View>
+            )}
+
             {/* Botão de Ação */}
             <Button
               mode="contained"
               onPress={handleSubmit}
               loading={loading}
               disabled={loading}
-              buttonColor="#4f46e5"
+              buttonColor={isAdmin && modo === 'CADASTRO' ? '#b45309' : '#4f46e5'}
               style={styles.actionButton}
               contentStyle={styles.buttonContent}
-              icon={modo === 'LOGIN' ? 'login' : 'account-plus'}
+              icon={modo === 'LOGIN' ? 'login' : isAdmin ? 'crown' : 'account-plus'}
             >
-              {modo === 'LOGIN' ? 'Entrar' : 'Cadastrar e Acessar'}
+              {modo === 'LOGIN'
+                ? 'Entrar'
+                : isAdmin
+                ? 'Cadastrar como Administrador (ADM)'
+                : 'Cadastrar e Acessar'}
             </Button>
           </Card.Content>
         </Card>
@@ -316,8 +341,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     fontSize: 14,
   },
+  admSwitchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fffbeb',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#fef3c7',
+    marginTop: 14,
+  },
+  admSwitchLabel: {
+    fontWeight: '800',
+    color: '#92400e',
+    fontSize: 12.5,
+  },
+  admSwitchDesc: {
+    color: '#b45309',
+    fontSize: 11,
+    marginTop: 2,
+  },
   actionButton: {
-    marginTop: 22,
+    marginTop: 20,
     borderRadius: 12,
   },
   buttonContent: {

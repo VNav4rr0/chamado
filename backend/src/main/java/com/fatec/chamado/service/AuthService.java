@@ -9,6 +9,8 @@ import com.fatec.chamado.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class AuthService {
 
@@ -46,11 +48,13 @@ public class AuthService {
             throw new RuntimeException("Nome de usuário já está em uso: " + username);
         }
 
+        String role = request.isAdmin() ? "ROLE_ADMIN" : "ROLE_USER";
+
         Usuario novo = new Usuario(
                 username,
                 passwordEncoder.encode(request.getPassword().trim()),
                 request.getNome().trim(),
-                "ROLE_USER"
+                role
         );
 
         return usuarioRepository.save(novo);
@@ -58,5 +62,9 @@ public class AuthService {
 
     public Usuario findByUsername(String username) {
         return usuarioRepository.findByUsername(username).orElse(null);
+    }
+
+    public List<Usuario> listarTodos() {
+        return usuarioRepository.findAll();
     }
 }

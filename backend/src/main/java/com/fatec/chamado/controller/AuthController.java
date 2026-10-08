@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -66,5 +67,10 @@ public class AuthController {
                 "nome", "Operador",
                 "role", "ROLE_USER"
         ));
+    }
+
+    @GetMapping({"/api/auth/usuarios", "/auth/usuarios"})
+    public ResponseEntity<List<Usuario>> listarUsuarios() {
+        return ResponseEntity.ok(authService.listarTodos());
     }
 }

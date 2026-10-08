@@ -18,27 +18,39 @@ let chamadosLocais: Chamado[] = [
     criadoEm: '07/10/2026 15:45:00',
     usuarioId: 'user',
   },
+  {
+    id: 'CH-1003',
+    titulo: 'Reset de credenciais de VPN',
+    descricao: 'Usuário bloqueado após tentativas repetidas de senha incorreta.',
+    status: 'ABERTO',
+    criadoEm: '07/10/2026 16:10:00',
+    usuarioId: 'admin',
+  },
 ];
 
 let logsLocais: MensagemLog[] = [
   {
     id: 'log-1',
     tipo: 'SUCESSO',
-    mensagem: 'Sistema pronto. Fila de mensageria assíncrona conectada ao banco H2.',
+    mensagem: 'Sistema operacional. Mensageria conectada e pronta para eventos.',
     timestamp: new Date().toLocaleTimeString(),
   },
 ];
 
 export class ChamadoService {
-  public static async listarChamados(): Promise<Chamado[]> {
+  public static async listarChamados(usuarioId?: string): Promise<Chamado[]> {
     try {
-      const data = await requestApi<Chamado[]>('/api/chamados');
-      if (Array.isArray(data) && data.length > 0) {
+      const endpoint = usuarioId ? `/api/chamados?usuarioId=${encodeURIComponent(usuarioId)}` : '/api/chamados';
+      const data = await requestApi<Chamado[]>(endpoint);
+      if (Array.isArray(data)) {
         chamadosLocais = data;
         return data;
       }
     } catch (e: any) {
       console.log('Backend offline, usando dados locais de chamados:', e.message);
+    }
+    if (usuarioId) {
+      return chamadosLocais.filter((c) => c.usuarioId === usuarioId);
     }
     return [...chamadosLocais];
   }
@@ -67,6 +79,38 @@ export class ChamadoService {
       };
       chamadosLocais.unshift(novoLocal);
       return novoLocal;
+    }
+  }
+
+  public static async atualizarStatus(id: string, novoStatus: string): Promise<Chamado | null> {
+    try {
+      const atualizado = await requestApi<Chamado>(`/api/chamados/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: novoStatus }),
+      });
+      const idx = chamadosLocais.findIndex((c) => c.id === id);
+      if (idx >= 0) chamadosLocais[idx] = atualizado;
+      return atualizado;
+    } catch (e: any) {
+      console.log('Backend offline, atualizando localmente:', e.message);
+      const c = chamadosLocais.find((item) => item.id === id);
+      if (c) {
+        c.status = novoStatus;
+        return { ...c };
+      }
+      return null;
+    }
+  }
+
+  public static async deletarChamado(id: string): Promise<boolean> {
+    try {
+      await requestApi(`/api/chamados/${id}`, { method: 'DELETE' });
+      chamadosLocais = chamadosLocais.filter((c) => c.id !== id);
+      return true;
+    } catch (e: any) {
+      console.log('Backend offline, deletando localmente:', e.message);
+      chamadosLocais = chamadosLocais.filter((c) => c.id !== id);
+      return true;
     }
   }
 
