@@ -1,32 +1,48 @@
 const API_BASE_URL = 'http://localhost:8080';
 
-export async function postChamado(titulo: string, descricao: string): Promise<any> {
+let authToken: string | null = null;
+let currentUsername: string = 'admin';
+
+export function setAuthToken(token: string | null, username?: string) {
+  authToken = token;
+  if (username) currentUsername = username;
+}
+
+export function getAuthToken(): string | null {
+  return authToken;
+}
+
+export async function requestApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  const url = `${API_BASE_URL}${endpoint}`;
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Usuario-Id': currentUsername,
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    ...(options.headers as Record<string, string>),
+  };
+
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
+  const timeoutId = setTimeout(() => controller.abort(), 4000);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/chamados`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Usuario-Id': 'user-fatec-1',
-      },
-      body: JSON.stringify({
-        titulo: titulo.trim(),
-        descricao: descricao.trim(),
-        categoria: 'SOFTWARE',
-        prioridade: 'MEDIA',
-      }),
+    const response = await fetch(url, {
+      ...options,
+      headers,
       signal: controller.signal,
     });
 
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      throw new Error(`Erro ${response.status}: ${response.statusText}`);
+      const errText = await response.text();
+      throw new Error(`Erro na API (${response.status}): ${errText || response.statusText}`);
     }
 
-    return await response.json();
+    if (response.status === 204) {
+      return {} as T;
+    }
+
+    return (await response.json()) as T;
   } catch (error: any) {
     clearTimeout(timeoutId);
     throw error;

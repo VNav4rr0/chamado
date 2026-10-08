@@ -19,7 +19,7 @@ Solução integrada de microsserviços em **Spring Boot 3**, **Spring Cloud Gate
                              ▼ HTTP REST (X-Usuario-Id / Bearer JWT)
                ┌───────────────────────────┐
                │          GATEWAY          │  Porta: 8080
-               │  (Spring Cloud Gateway)   │  ViniciusVChabariberi/GATEWAY
+               │  (Spring Cloud Gateway)   │  
                └─────────────┬─────────────┘
                              │
        ┌─────────────────────┼─────────────────────┐
@@ -37,7 +37,7 @@ Solução integrada de microsserviços em **Spring Boot 3**, **Spring Cloud Gate
 
 ---
 
-## 🧩 Detalhamento dos Componentes e Ajustes Realizados
+##  Detalhamento dos Componentes e Ajustes Realizados
 
 ### 1. `GATEWAY` (Baseado em `ViniciusVChabariberi/GATEWAY` - Porta 8080)
 - **Roteamento Unificado**: Configurado em `application.yaml` para mapear:
@@ -92,7 +92,7 @@ Solução integrada de microsserviços em **Spring Boot 3**, **Spring Cloud Gate
 
 ---
 
-## ⚡ Como Compilar e Rodar Tudo em Paralelo
+## Como Compilar e Rodar Tudo em Paralelo
 
 ### Pré-requisitos
 - **Java JDK 17** ou superior (`java -version`)

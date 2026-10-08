@@ -1,59 +1,71 @@
-# Central de Chamados - Portal Front-end Simplificado
+# Central de Chamados - Aplicação Integrada e Simplificada
 
-Portal web simplificado e objetivo para abertura de chamados técnicos e demonstração visual de **mensageria assíncrona orientada a eventos**, desenvolvido em **React Native for Web**, **TypeScript** e **Material Design 3 (React Native Paper)**.
-
----
-
-## 🎯 Características do Front-end Simplificado
-
-1. **Formulário Único & Direto**:
-   - Campos essenciais de **Título** e **Descrição**.
-   - Validação imediata e criação com disparo de mensagem em tempo real.
-   - Card com resumo visual do último chamado registrado e confirmado.
-
-2. **Seção Visual de Mensageria & Logs em Tempo Real**:
-   - **Pipeline Visual em 4 Etapas**:
-     1. 🚀 **Disparo**: Chamado enviado ao broker/fila.
-     2. 📥 **Na Fila**: Evento enfileirado (`chamado.criado`).
-     3. ⚙️ **Worker**: Consumo assíncrono pelo processador concorrente.
-     4. ✅ **Sucesso (ACK)**: Confirmação de recebimento e persistência.
-   - **Disparo Manual de Teste**: Botão para simular o tráfego de mensageria avulso a qualquer momento.
-   - **Terminal de Eventos**: Log cronológico com badges coloridos, timestamp e descrição detalhada.
-
-3. **Arquitetura Limpa**:
-   - Todos os ecrãs secundários, abas complexas, rotas legadas e regras redundantes foram removidos.
-   - Código enxuto e de inicialização instantânea.
+Sistema completo e limpo para abertura e gestão de chamados com **Login JWT**, banco **H2 em memória** e **Simulação Interna de Mensageria**, desenvolvido com **Spring Boot 3** no back-end e **React Native Web / Expo** no front-end.
 
 ---
 
-## 🚀 Como Executar o Front-end
+## 🎯 Arquitetura Integrada
 
-Dentro da pasta do projeto:
+```
+┌─────────────────────────────────┐
+│     Front-end (React Native)    │ (Porta 8081 / Expo Web)
+│  - Tela de Login com JWT        │
+│  - Formulário & Lista Chamados  │
+│  - Monitor de Mensageria        │
+└────────────────┬────────────────┘
+                 │ HTTP REST (JSON + Bearer Token)
+                 ▼
+┌─────────────────────────────────┐
+│     Back-end (Spring Boot 3)    │ (Porta 8080)
+│  - Auth & Login Controller      │
+│  - Chamados Controller (CRUD)   │
+│  - Motor Interno de Mensageria  │
+│  - Banco de Dados H2 em Memória │ (jdbc:h2:mem:chamadodb)
+└─────────────────────────────────┘
+```
 
+---
+
+## 🔑 Credenciais Padrão Pré-Cadastradas
+
+| Usuário | Senha | Papel (Role) | Descrição |
+| :--- | :--- | :--- | :--- |
+| **`admin`** | `admin123` | `ROLE_ADMIN` | Administrador TI |
+| **`user`** | `123456` | `ROLE_USER` | Estudante FATEC |
+
+*(Na tela de login, há botões de preenchimento rápido para demonstração instantânea)*
+
+---
+
+## 🚀 Como Executar o Sistema
+
+### 1. Iniciar o Back-end (Spring Boot)
+No PowerShell, dentro da pasta `backend`:
+```powershell
+cd c:\Users\Estágio\chamado\backend
+.\run.ps1
+```
+*(Ou dê duplo clique em `backend/run.bat` ou execute `mvn spring-boot:run`)*
+
+O servidor subirá na porta **8080**. O console do banco H2 fica disponível em `http://localhost:8080/h2-console`.
+
+### 2. Iniciar o Front-end (React Native Web)
+No terminal, dentro da pasta raiz `chamado`:
 ```bash
 cmd /c "npm start"
 ```
+*(Ou execute diretamente `cmd /c "npx expo start --web"`)*
 
-Ou diretamente com o Expo Web:
-
-```bash
-cmd /c "npx expo start --web"
-```
-
-A aplicação abrirá no seu navegador padrão em `http://localhost:8081`.
+Acesse `http://localhost:8081` no seu navegador!
 
 ---
 
-## 🏛️ Microsserviços Backend (Pasta `backend/`)
+## 📱 Fluxo da Aplicação
 
-Na pasta [`backend/`](file:///c:/Users/Estágio/chamado/backend), você encontra a arquitetura completa de microsserviços Spring Boot com banco H2:
-- **`GATEWAY`** (Porta 8080)
-- **`LOGIN`** (Porta 8083)
-- **`chamado-service`** (Porta 8081)
-- **`mensageria-service`** (Porta 8082)
-
-Para iniciar os 4 microsserviços em paralelo:
-```powershell
-cd backend
-.\run-all.ps1
-```
+1. **Tela de Login**: O usuário insere suas credenciais válidas e recebe o token JWT assinado.
+2. **Painel de Chamados**:
+   - Visualização do perfil autenticado com botão de **Logout (Sair)**.
+   - Formulário simples com **Título** e **Descrição** para abrir novos chamados.
+   - Listagem em tempo real de todos os chamados gravados no H2.
+3. **Monitor Visual de Mensageria**:
+   - Sempre que um chamado é aberto, o backend executa em uma thread assíncrona o pipeline de enfileiramento e confirmação (ACK), gerando logs com destaque visual no console do Spring Boot e na tela do usuário.

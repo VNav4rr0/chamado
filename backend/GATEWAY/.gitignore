@@ -1,7 +1,0 @@
-﻿target/
-*.class
-*.jar
-.env
-*.log
-.idea/
-*.iml

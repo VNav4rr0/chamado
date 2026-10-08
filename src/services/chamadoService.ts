@@ -1,98 +1,97 @@
-import { Chamado, EventoMensageria } from '../types/chamado';
-import { postChamado } from './api';
+import { Chamado, MensagemLog } from '../types/chamado';
+import { requestApi } from './api';
+
+let chamadosLocais: Chamado[] = [
+  {
+    id: 'CH-1001',
+    titulo: 'Instalação do Docker e Java 21',
+    descricao: 'Preparar máquinas para desenvolvimento e testes práticos.',
+    status: 'CONCLUIDO',
+    criadoEm: '07/10/2026 14:30:00',
+    usuarioId: 'admin',
+  },
+  {
+    id: 'CH-1002',
+    titulo: 'Instabilidade na conexão do Bloco B',
+    descricao: 'Roteador do segundo andar apresenta oscilações frequentes.',
+    status: 'EM_PROCESSAMENTO',
+    criadoEm: '07/10/2026 15:45:00',
+    usuarioId: 'user',
+  },
+];
+
+let logsLocais: MensagemLog[] = [
+  {
+    id: 'log-1',
+    tipo: 'SUCESSO',
+    mensagem: 'Sistema pronto. Fila de mensageria assíncrona conectada ao banco H2.',
+    timestamp: new Date().toLocaleTimeString(),
+  },
+];
 
 export class ChamadoService {
-  public static async criarChamadoComMensageria(
-    titulo: string,
-    descricao: string,
-    onEvento: (evento: EventoMensageria) => void
-  ): Promise<Chamado> {
-    const chamadoId = `CH-${Date.now().toString().slice(-5)}`;
-    const agora = new Date().toLocaleTimeString();
-
-    // 1. Etapa: Disparo
-    onEvento({
-      id: `evt-${Date.now()}-1`,
-      timestamp: agora,
-      tipo: 'DISPARO',
-      mensagem: `🚀 [DISPARO] Chamado "${titulo}" submetido. Publicando evento no broker...`,
-      chamadoId,
-      payload: { id: chamadoId, titulo, descricao },
-    });
-
-    let backendResponse: any = null;
+  public static async listarChamados(): Promise<Chamado[]> {
     try {
-      backendResponse = await postChamado(titulo, descricao);
+      const data = await requestApi<Chamado[]>('/api/chamados');
+      if (Array.isArray(data) && data.length > 0) {
+        chamadosLocais = data;
+        return data;
+      }
     } catch (e: any) {
-      console.log('Gateway backend não respondeu (executando em modo demonstração local):', e.message);
+      console.log('Backend offline, usando dados locais de chamados:', e.message);
     }
-
-    // 2. Etapa: Enfileiramento (após 600ms)
-    await new Promise((r) => setTimeout(r, 600));
-    onEvento({
-      id: `evt-${Date.now()}-2`,
-      timestamp: new Date().toLocaleTimeString(),
-      tipo: 'FILA',
-      mensagem: `📥 [FILA] Evento enfileirado no tópico 'chamado.eventos'. Routing key: chamado.criado`,
-      chamadoId,
-    });
-
-    // 3. Etapa: Processamento Assíncrono (após 800ms)
-    await new Promise((r) => setTimeout(r, 800));
-    onEvento({
-      id: `evt-${Date.now()}-3`,
-      timestamp: new Date().toLocaleTimeString(),
-      tipo: 'PROCESSAMENTO',
-      mensagem: `⚙️ [WORKER] Thread consumidora assumiu o evento. Validando dados e processando...`,
-      chamadoId,
-    });
-
-    // 4. Etapa: Confirmação e Sucesso (após 900ms)
-    await new Promise((r) => setTimeout(r, 900));
-    onEvento({
-      id: `evt-${Date.now()}-4`,
-      timestamp: new Date().toLocaleTimeString(),
-      tipo: 'SUCESSO',
-      mensagem: `✅ [SUCESSO / ACK] Mensageria finalizada com êxito! Confirmação de recebimento registrada.`,
-      chamadoId,
-    });
-
-    return {
-      id: backendResponse?.id || chamadoId,
-      titulo,
-      descricao,
-      status: 'CONCLUIDO',
-      criadoEm: new Date().toLocaleTimeString(),
-    };
+    return [...chamadosLocais];
   }
 
-  public static async simularMensageriaManual(
-    tituloExemplo: string,
-    onEvento: (evento: EventoMensageria) => void
-  ): Promise<void> {
-    const agora = new Date().toLocaleTimeString();
+  public static async criarChamado(
+    titulo: string,
+    descricao: string,
+    usuarioId: string = 'admin'
+  ): Promise<Chamado> {
+    try {
+      const novo = await requestApi<Chamado>('/api/chamados', {
+        method: 'POST',
+        body: JSON.stringify({ titulo: titulo.trim(), descricao: descricao.trim() }),
+      });
+      chamadosLocais.unshift(novo);
+      return novo;
+    } catch (e: any) {
+      console.log('Backend offline, gerando chamado no buffer local:', e.message);
+      const novoLocal: Chamado = {
+        id: `CH-${Date.now().toString().slice(-4)}`,
+        titulo: titulo.trim(),
+        descricao: descricao.trim(),
+        status: 'ABERTO',
+        criadoEm: new Date().toLocaleString(),
+        usuarioId,
+      };
+      chamadosLocais.unshift(novoLocal);
+      return novoLocal;
+    }
+  }
 
-    onEvento({
-      id: `evt-${Date.now()}-m1`,
-      timestamp: agora,
-      tipo: 'DISPARO',
-      mensagem: `⚡ [TESTE MANUAL] Publicação forçada de mensagem de teste para o broker...`,
-    });
+  public static async obterLogsMensageria(): Promise<MensagemLog[]> {
+    try {
+      const logs = await requestApi<MensagemLog[]>('/api/mensageria/logs');
+      if (Array.isArray(logs) && logs.length > 0) {
+        return logs;
+      }
+    } catch (e: any) {
+      // Backend offline, usa logs locais
+    }
+    return [...logsLocais];
+  }
 
-    await new Promise((r) => setTimeout(r, 500));
-    onEvento({
-      id: `evt-${Date.now()}-m2`,
+  public static async registrarLogSimulado(tipo: string, mensagem: string, chamadoId?: string): Promise<MensagemLog> {
+    const log: MensagemLog = {
+      id: `log-${Date.now()}`,
+      chamadoId,
+      tipo,
+      mensagem,
       timestamp: new Date().toLocaleTimeString(),
-      tipo: 'FILA',
-      mensagem: `📬 [TESTE MANUAL] Mensagem aceita pelo broker com entrega garantida (persistent: true).`,
-    });
-
-    await new Promise((r) => setTimeout(r, 700));
-    onEvento({
-      id: `evt-${Date.now()}-m3`,
-      timestamp: new Date().toLocaleTimeString(),
-      tipo: 'SUCESSO',
-      mensagem: `🎉 [TESTE MANUAL] Fluxo assíncrono concluído! Mensageria operacional.`,
-    });
+      threadName: 'worker-async-pool',
+    };
+    logsLocais.unshift(log);
+    return log;
   }
 }

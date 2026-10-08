@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: central-chamados-api
+  datasource:
+    url: jdbc:h2:mem:chamadodb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: true
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+jwt:
+  secret: "minha-chave-secreta-super-segura-jwt-fatec-2026-com-ao-menos-256-bits!"
+  expiration-ms: 86400000 # 24 horas
+
+mensageria:
+  simulacao-delay-ms: 1200 # Tempo de simulação da mensageria assíncrona

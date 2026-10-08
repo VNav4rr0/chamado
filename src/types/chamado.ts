@@ -2,8 +2,9 @@ export interface Chamado {
   id: string;
   titulo: string;
   descricao: string;
-  status: 'ABERTO' | 'EM_PROCESSAMENTO' | 'CONCLUIDO';
+  status: string; // ABERTO, EM_PROCESSAMENTO, CONCLUIDO
   criadoEm: string;
+  usuarioId?: string;
 }
 
 export interface CriarChamadoDTO {
@@ -11,11 +12,11 @@ export interface CriarChamadoDTO {
   descricao: string;
 }
 
-export interface EventoMensageria {
-  id: string;
-  timestamp: string;
-  tipo: 'DISPARO' | 'FILA' | 'PROCESSAMENTO' | 'SUCESSO';
-  mensagem: string;
+export interface MensagemLog {
+  id?: number | string;
   chamadoId?: string;
-  payload?: any;
+  tipo: string; // DISPARO, FILA, WORKER, SUCESSO
+  mensagem: string;
+  timestamp: string;
+  threadName?: string;
 }

@@ -1,64 +1,10 @@
 version: '3.8'
 
 services:
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: chamado-rabbitmq
-    ports:
-      - "5672:5672"   # Protocolo AMQP
-      - "15672:15672" # Painel Web Management (user: guest / pass: guest)
-    environment:
-      RABBITMQ_DEFAULT_USER: guest
-      RABBITMQ_DEFAULT_PASS: guest
-
-  login-service:
-    build:
-      context: ./LOGIN
-    container_name: chamado-login-service
-    ports:
-      - "8083:8083"
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - JWT_SECRET=minha-chave-secreta-super-segura-jwt-fatec-2026-com-ao-menos-256-bits!
-
-  chamado-service:
-    build:
-      context: ./chamado-service
-    container_name: chamado-service
-    ports:
-      - "8081:8081"
-    depends_on:
-      - rabbitmq
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SERVICES_MENSAGERIA_URL=http://mensageria-service:8082
-
-  mensageria-service:
-    build:
-      context: ./mensageria-service
-    container_name: chamado-mensageria-service
-    ports:
-      - "8082:8082"
-    depends_on:
-      - rabbitmq
-      - chamado-service
-    environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - SERVICES_CHAMADO_URL=http://chamado-service:8081
-
-  api-gateway:
-    build:
-      context: ./GATEWAY
-    container_name: chamado-api-gateway
+  app:
+    build: .
+    container_name: central-chamados-api
     ports:
       - "8080:8080"
-    depends_on:
-      - login-service
-      - chamado-service
-      - mensageria-service
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
-      - JWT_SECRET=minha-chave-secreta-super-segura-jwt-fatec-2026-com-ao-menos-256-bits!
-      - LOGIN_URL=http://login-service:8083
-      - CHAMADO_URL=http://chamado-service:8081
-      - MENSAGERIA_URL=http://mensageria-service:8082
+      - SPRING_PROFILES_ACTIVE=prod
